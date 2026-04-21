@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and Discussion
+    url: https://github.com/burnside-project/pg-cdc/discussions
+    about: Ask questions, share ideas, or discuss pg-cdc usage
+  - name: Security Vulnerability
+    url: https://github.com/burnside-project/pg-cdc/blob/main/SECURITY.md
+    about: Report security vulnerabilities privately
