@@ -232,6 +232,26 @@ The open-source edition covers the full CDC pipeline: logical replication, base/
 - Extended CLI: `pg-cdc acl register|get|set|diff|sync|list`
 - HIPAA-ready deployment topology
 
+### Governance in action
+
+The commercial edition extends open-core CDC output with a tag-based governance layer. End to end:
+
+**1. pg-cdc writes Parquet + manifest to cloud storage** — one prefix per table, plus a top-level `manifest.json` describing schema and epoch ordering:
+
+![S3 Parquet output — per-table prefixes and manifest.json](assets/s3-parquet-output.png)
+
+**2. pg-cdc registers Parquet tables in Glue Data Catalog** — the open-source `catalog register` command populates the catalog for downstream query engines:
+
+![Glue Data Catalog with CDC-registered Parquet tables](assets/glue-catalog-tables.png)
+
+**3. Governance intent is stored in a DynamoDB ACL registry** — every policy change is a versioned record, tagged (e.g. `sensitivity: internal`) and stamped with actor, reason, and timestamp:
+
+![DynamoDB ACL registry item — versioned policy record with tags](assets/dynamodb-acl-registry.png)
+
+**4. Tags are reconciled as LF-Tags on Glue tables** — `pg-cdc acl sync` drives Lake Formation's tag-based access control from the registry:
+
+![Lake Formation LF-Tags on a CDC table](assets/lake-formation-lf-tags.png)
+
 Details: [`docs/commercial-edition.md`](docs/commercial-edition.md).
 
 ## Related repos
