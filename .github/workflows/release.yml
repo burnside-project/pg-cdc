@@ -15,9 +15,6 @@ on:
 permissions:
   contents: write
 
-env:
-  PUBLIC_REPO: burnside-project/pg-cdc
-
 jobs:
 
   resolve:
@@ -132,26 +129,3 @@ jobs:
             --title "pg-cdc ${TAG}" \
             --notes-file /tmp/release-notes.md \
             --latest
-
-      - name: Mirror to public repo
-        env:
-          MIRROR_PAT: ${{ secrets.MIRROR_PAT }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if [ -z "$MIRROR_PAT" ]; then
-            echo "::notice::MIRROR_PAT not set; skipping public repo mirror"
-            exit 0
-          fi
-          if ! gh api "repos/${{ env.PUBLIC_REPO }}" --silent 2>/dev/null; then
-            echo "::notice::Public mirror repo ${{ env.PUBLIC_REPO }} does not exist yet; skipping mirror (infra is ready — create the repo to activate)"
-            exit 0
-          fi
-          TAG="${{ needs.resolve.outputs.tag }}"
-          git remote add public https://x-access-token:${MIRROR_PAT}@github.com/${{ env.PUBLIC_REPO }}.git
-          git push public main --force 2>/dev/null || true
-          git push public "${TAG}" --force 2>/dev/null || true
-          gh release create "${TAG}" dist/* \
-            --repo ${{ env.PUBLIC_REPO }} \
-            --title "pg-cdc ${TAG}" \
-            --notes-file /tmp/release-notes.md \
-            --latest 2>/dev/null || echo "::warning::Failed to create public release"
