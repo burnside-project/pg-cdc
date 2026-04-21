@@ -1,0 +1,80 @@
+# Type
+- name: bug
+  color: "d73a4a"
+  description: Something isn't working
+
+- name: feature
+  color: "0e8a16"
+  description: New functionality
+
+- name: enhancement
+  color: "a2eeef"
+  description: Improvement to existing functionality
+
+- name: documentation
+  color: "0075ca"
+  description: Documentation only changes
+
+- name: good first issue
+  color: "7057ff"
+  description: Good for newcomers
+
+- name: help wanted
+  color: "008672"
+  description: Extra attention is needed
+
+# Priority
+- name: "priority: critical"
+  color: "b60205"
+  description: Must be fixed immediately
+
+- name: "priority: high"
+  color: "d93f0b"
+  description: High priority
+
+- name: "priority: medium"
+  color: "fbca04"
+  description: Medium priority
+
+- name: "priority: low"
+  color: "0e8a16"
+  description: Low priority
+
+# Status
+- name: "status: needs triage"
+  color: "ededed"
+  description: Awaiting initial review
+
+- name: "status: in progress"
+  color: "1d76db"
+  description: Actively being worked on
+
+- name: "status: blocked"
+  color: "b60205"
+  description: Blocked by another issue or external dependency
+
+# Type modifiers
+- name: "type: breaking change"
+  color: "d73a4a"
+  description: Introduces a breaking change
+
+- name: "type: performance"
+  color: "f9d0c4"
+  description: Performance improvement
+
+- name: "type: security"
+  color: "e4e669"
+  description: Security related change
+
+- name: "type: refactor"
+  color: "c5def5"
+  description: Code refactoring with no behavior change
+
+# Infra
+- name: ci
+  color: "bfdadc"
+  description: CI/CD and build system
+
+- name: dependencies
+  color: "0366d6"
+  description: Dependency updates
