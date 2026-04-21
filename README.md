@@ -250,11 +250,15 @@ The commercial edition extends open-core CDC output with a tag-based governance 
 
 ![Glue Data Catalog with CDC-registered Parquet tables](assets/glue-catalog-tables.png)
 
-**3. Governance intent is stored in a DynamoDB ACL registry** — every policy change is a versioned record, tagged (e.g. `sensitivity: internal`) and stamped with actor, reason, and timestamp:
+**3. Operators apply ACL changes via GitHub Actions workflow dispatch** — the commercial edition ships a click-ops UI that wraps `pg-cdc acl set`. Tag keys and values are constrained to the Layer-1 taxonomy; an audit reason (≥8 chars) is required before the workflow runs:
+
+![GitHub Actions workflow dispatch form for applying ACL tag changes](assets/ops-acl-workflow-dispatch.png)
+
+**4. Governance intent is stored in a DynamoDB ACL registry** — each workflow run writes a versioned record, tagged (e.g. `sensitivity: internal`) and stamped with actor, reason, and timestamp:
 
 ![DynamoDB ACL registry item — versioned policy record with tags](assets/dynamodb-acl-registry.png)
 
-**4. Tags are reconciled as LF-Tags on Glue tables** — `pg-cdc acl sync` drives Lake Formation's tag-based access control from the registry:
+**5. Tags are reconciled as LF-Tags on Glue tables** — `pg-cdc acl sync` drives Lake Formation's tag-based access control from the registry:
 
 ![Lake Formation LF-Tags on a CDC table](assets/lake-formation-lf-tags.png)
 
