@@ -7,7 +7,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.32.14
 	github.com/aws/aws-sdk-go-v2/service/glue v1.139.3
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.99.0
-	github.com/burnside-project/burnside-go v0.2.1-0.20260414192506-01c7edd50da8
+	github.com/burnside-project/burnside-go v0.2.1
 	github.com/jackc/pglogrepl v0.0.0-20251213150135-2e8d0df862c1
 	github.com/jackc/pgx/v5 v5.9.1
 	github.com/parquet-go/parquet-go v0.25.0
