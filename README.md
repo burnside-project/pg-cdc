@@ -23,6 +23,16 @@ Change data capture from PostgreSQL is usually delivered by Debezium + Kafka + a
 
 A PostgreSQL CDC server that streams WAL changes into typed, compacted Parquet files in cloud storage. Follows the native PostgreSQL replica pattern: one publication, one replication slot, one streaming consumer. Suitable for teams who want CDC output as Parquet for downstream warehouses, data lakes, or analytical engines — without running Kafka, Debezium, or a warehouse loader.
 
+## Architecture
+
+**pg-cdc is the cloud-storage + data-governance layer. [pg-warehouse](https://github.com/burnside-project/pg-warehouse) is the developer-friendly local feature and analytics platform that consumes its output.**
+
+pg-cdc produces typed, compacted Parquet files in cloud storage. pg-warehouse consumes them. The contract between them is defined in [burnside-go](https://github.com/burnside-project/burnside-go) — a shared manifest spec with base snapshots, delta epochs, and role-based access profiles derived from PostgreSQL ACLs.
+
+Multiple developers pull from the same CDC stream independently. No shared DuckDB files, no locking, no contention.
+
+Internally, pg-cdc uses hexagonal architecture with clean port/adapter separation. CLI commands (Cobra) call services that depend only on port interfaces. Adapters for PostgreSQL (source), Parquet writer, filesystem/S3/GCS sinks, SQLite state, and Glue catalog implement those interfaces. New sinks or catalog backends plug in without changing business logic.
+
 ## Quick comparison
 
 |                         | pg-cdc                       | Debezium + Kafka            | AWS DMS                    | Fivetran / Airbyte          |
@@ -215,10 +225,6 @@ tables:
 ```
 
 Full reference: [`docs/02-configuration.md`](docs/02-configuration.md).
-
-## Architecture
-
-pg-cdc uses hexagonal architecture with clean port/adapter separation. CLI commands (Cobra) call services that depend only on port interfaces. Adapters for PostgreSQL (source), Parquet writer, filesystem/S3/GCS sinks, SQLite state, and Glue catalog implement those interfaces. New sinks or catalog backends plug in without changing business logic.
 
 ## Open Core
 
