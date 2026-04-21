@@ -1,0 +1,249 @@
+name: CI/CD
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+    paths-ignore:
+      - '*.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.gitignore'
+      - 'RELEASES.md'
+
+permissions:
+  contents: write
+
+env:
+  GO_VERSION: "1.25"
+  PUBLIC_REPO: burnside-project/pg-cdc
+
+jobs:
+
+  # --- CI Gates (PR + push) ---
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: latest
+          args: --timeout=5m
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - run: go vet ./...
+      - run: go test -race -count=1 -timeout 120s ./...
+
+  # --- CD Pipeline (push to main only) ---
+
+  resolve-rc:
+    name: Resolve RC
+    if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    outputs:
+      rc_version: ${{ steps.rc.outputs.rc_version }}
+      rc_number: ${{ steps.rc.outputs.rc_number }}
+      base_version: ${{ steps.rc.outputs.base_version }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Determine next RC
+        id: rc
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BASE=$(cat VERSION | tr -d '[:space:]')
+          TAG_BASE="v${BASE}"
+
+          if gh release view "$TAG_BASE" --repo ${{ github.repository }} --json tagName --jq '.tagName' 2>/dev/null; then
+            echo "::notice::Stable ${TAG_BASE} exists. Bump VERSION for new RCs."
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          LATEST_RC=$(gh api repos/${{ github.repository }}/git/matching-refs/tags/${TAG_BASE}-rc \
+            --jq '.[].ref' 2>/dev/null \
+            | sed 's|refs/tags/||' \
+            | grep -E "^${TAG_BASE}-rc[0-9]+$" \
+            | sort -t'c' -k2 -n \
+            | tail -1 || true)
+
+          if [ -z "$LATEST_RC" ]; then
+            RC_NUM=1
+          else
+            PREV_NUM=$(echo "$LATEST_RC" | grep -oP 'rc\K[0-9]+')
+            RC_NUM=$((PREV_NUM + 1))
+          fi
+
+          RC_VERSION="${TAG_BASE}-rc${RC_NUM}"
+          echo "rc_version=${RC_VERSION}" >> $GITHUB_OUTPUT
+          echo "rc_number=${RC_NUM}" >> $GITHUB_OUTPUT
+          echo "base_version=${TAG_BASE}" >> $GITHUB_OUTPUT
+          echo "### ${RC_VERSION}" >> $GITHUB_STEP_SUMMARY
+
+  build-binaries:
+    name: Build All Platforms
+    needs: resolve-rc
+    if: needs.resolve-rc.outputs.rc_version != '' && !startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Build all platforms (pure Go, no CGO)
+        run: |
+          VERSION=${{ needs.resolve-rc.outputs.rc_version }}
+          for pair in linux/amd64 linux/arm64 darwin/arm64 windows/amd64; do
+            GOOS=${pair%/*}
+            GOARCH=${pair#*/}
+            EXT=""
+            [ "$GOOS" = "windows" ] && EXT=".exe"
+            BINARY="pg-cdc-${GOOS}-${GOARCH}${EXT}"
+
+            CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -trimpath \
+              -ldflags "-s -w -X github.com/burnside-project/pg-cdc-core/pkg/version.Version=${VERSION}" \
+              -o "${BINARY}" ./cmd/pg-cdc/
+
+            if [ "$GOOS" = "windows" ]; then
+              zip "pg-cdc_${VERSION}_${GOOS}_${GOARCH}.zip" "${BINARY}" README.md LICENSE
+            else
+              tar czf "pg-cdc_${VERSION}_${GOOS}_${GOARCH}.tar.gz" "${BINARY}" README.md LICENSE
+            fi
+          done
+
+      - name: Generate checksums
+        run: sha256sum pg-cdc_* > checksums.txt && cat checksums.txt
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: binaries
+          path: |
+            pg-cdc_*
+            checksums.txt
+          retention-days: 5
+
+  publish-rc:
+    name: Publish RC
+    needs: [resolve-rc, build-binaries]
+    if: needs.resolve-rc.outputs.rc_version != '' && !startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: binaries
+          path: dist/
+
+      - name: Create RC tag
+        run: |
+          RC_VERSION=${{ needs.resolve-rc.outputs.rc_version }}
+          git tag "$RC_VERSION"
+          git push origin "$RC_VERSION"
+
+      - name: Generate release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RC_VERSION=${{ needs.resolve-rc.outputs.rc_version }}
+          RC_NUM=${{ needs.resolve-rc.outputs.rc_number }}
+          BASE_VERSION=${{ needs.resolve-rc.outputs.base_version }}
+          COMMIT=${GITHUB_SHA::8}
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
+
+          {
+            echo "> **Release candidate for ${BASE_VERSION}** — built automatically from \`main\`."
+            echo ""
+            echo "## RC ${RC_NUM}"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| **Target** | \`${BASE_VERSION}\` |"
+            echo "| **Commit** | [\`${COMMIT}\`](https://github.com/${{ github.repository }}/commit/${GITHUB_SHA}) |"
+            echo "| **Platforms** | Linux amd64/arm64, macOS arm64, Windows amd64 |"
+            echo "| **CGO** | None (pure Go) |"
+
+            if [ -n "$PREV_TAG" ]; then
+              echo ""
+              echo "## Changes since ${PREV_TAG}"
+              echo ""
+              git log ${PREV_TAG}..HEAD --pretty=format:"- %s (\`%h\`)" --no-merges | head -50
+            fi
+
+            echo ""
+            echo "## Install"
+            echo ""
+            echo '```bash'
+            echo "# Linux (amd64)"
+            echo "curl -fsSL https://github.com/${{ github.repository }}/releases/download/${RC_VERSION}/pg-cdc_${RC_VERSION}_linux_amd64.tar.gz | tar xz"
+            echo ""
+            echo "# macOS (Apple Silicon)"
+            echo "curl -fsSL https://github.com/${{ github.repository }}/releases/download/${RC_VERSION}/pg-cdc_${RC_VERSION}_darwin_arm64.tar.gz | tar xz"
+            echo '```'
+          } > /tmp/release-notes.md
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ needs.resolve-rc.outputs.rc_version }}" \
+            dist/* \
+            --repo ${{ github.repository }} \
+            --title "pg-cdc ${{ needs.resolve-rc.outputs.rc_version }}" \
+            --notes-file /tmp/release-notes.md \
+            --target ${{ github.sha }} \
+            --prerelease
+
+      - name: Rename workflow run to show RC version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }} \
+            -X PATCH -f name="${{ needs.resolve-rc.outputs.rc_version }}" 2>/dev/null || true
+
+      - name: Mirror to public repo
+        env:
+          MIRROR_PAT: ${{ secrets.MIRROR_PAT }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -z "$MIRROR_PAT" ]; then
+            echo "::notice::MIRROR_PAT not set; skipping public repo mirror"
+            exit 0
+          fi
+          if ! gh api "repos/${{ env.PUBLIC_REPO }}" --silent 2>/dev/null; then
+            echo "::notice::Public mirror repo ${{ env.PUBLIC_REPO }} does not exist yet; skipping mirror (infra is ready — create the repo to activate)"
+            exit 0
+          fi
+          RC_VERSION=${{ needs.resolve-rc.outputs.rc_version }}
+          git remote add public https://x-access-token:${MIRROR_PAT}@github.com/${{ env.PUBLIC_REPO }}.git
+          git push public "${RC_VERSION}" --force 2>/dev/null || echo "::warning::Failed to push tag"
+          gh release create "${RC_VERSION}" dist/* \
+            --repo ${{ env.PUBLIC_REPO }} \
+            --title "pg-cdc ${RC_VERSION}" \
+            --notes-file /tmp/release-notes.md \
+            --prerelease 2>/dev/null || echo "::warning::Failed to create public release"
+

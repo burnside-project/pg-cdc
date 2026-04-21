@@ -1,0 +1,63 @@
+# /etc/systemd/system/pg-cdc.service
+#
+# pg-cdc — PostgreSQL CDC to Parquet streaming service
+#
+# Install:
+#   sudo cp pg-cdc.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now pg-cdc
+#
+# Logs:
+#   journalctl -u pg-cdc -f
+#
+# Prerequisites:
+#   - Binary at /usr/local/bin/pg-cdc
+#   - Config at /etc/pg-cdc/pg-cdc.yml
+#   - Service user: sudo useradd --system --shell /usr/sbin/nologin --home-dir /var/lib/pg-cdc pgcdc
+#   - State dir:    sudo mkdir -p /var/lib/pg-cdc && sudo chown pgcdc:pgcdc /var/lib/pg-cdc
+#   - Config dir:   sudo mkdir -p /etc/pg-cdc && sudo chmod 750 /etc/pg-cdc
+
+[Unit]
+Description=pg-cdc CDC daemon
+Documentation=https://github.com/burnside-project/pg-cdc
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pgcdc
+Group=pgcdc
+
+WorkingDirectory=/var/lib/pg-cdc
+
+# Clear stale locks from previous unclean shutdown
+ExecStartPre=-/usr/bin/sqlite3 /var/lib/pg-cdc/.pgcdc/state.db 'DELETE FROM lock_state;'
+ExecStart=/usr/local/bin/pg-cdc start --config /etc/pg-cdc/pg-cdc.yml
+
+Restart=always
+RestartSec=5
+
+# Resource limits
+MemoryMax=512M
+MemoryHigh=384M
+CPUQuota=50%
+TasksMax=100
+LimitNOFILE=65536
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ReadWritePaths=/var/lib/pg-cdc
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pg-cdc
+
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

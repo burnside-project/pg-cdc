@@ -1,0 +1,157 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.1.0). Must have existing RCs.'
+        required: true
+        type: string
+      rc:
+        description: 'RC number to promote (e.g., 3 for v0.1.0-rc3). Leave empty for latest RC.'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  PUBLIC_REPO: burnside-project/pg-cdc
+
+jobs:
+
+  resolve:
+    name: Resolve Version
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      rc_tag: ${{ steps.resolve.outputs.rc_tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Determine tags
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${{ github.event.inputs.version }}"
+
+          if [ -n "${{ github.event.inputs.rc }}" ]; then
+            RC_TAG="${TAG}-rc${{ github.event.inputs.rc }}"
+          else
+            RC_TAG=$(gh api repos/${{ github.repository }}/git/matching-refs/tags/${TAG}-rc \
+              --jq '.[].ref' 2>/dev/null \
+              | sed 's|refs/tags/||' \
+              | grep -E "^${TAG}-rc[0-9]+$" \
+              | sort -t'c' -k2 -n \
+              | tail -1 || true)
+          fi
+
+          if [ -z "$RC_TAG" ]; then
+            echo "::error::No RC found for ${TAG}."
+            exit 1
+          fi
+
+          if ! gh release view "$RC_TAG" --repo ${{ github.repository }} --json tagName 2>/dev/null; then
+            echo "::error::Release ${RC_TAG} not found."
+            exit 1
+          fi
+
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "rc_tag=${RC_TAG}" >> $GITHUB_OUTPUT
+          echo "### Promoting ${RC_TAG} -> ${TAG}" >> $GITHUB_STEP_SUMMARY
+
+  promote:
+    name: Promote to Stable
+    needs: resolve
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download RC assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p dist/
+          gh release download "${{ needs.resolve.outputs.rc_tag }}" \
+            --repo ${{ github.repository }} \
+            --dir dist/ \
+            --pattern '*.tar.gz' --pattern '*.zip' --pattern 'checksums.txt'
+
+          RC_TAG="${{ needs.resolve.outputs.rc_tag }}"
+          TAG="${{ needs.resolve.outputs.tag }}"
+          cd dist/
+          for f in *"${RC_TAG}"*; do
+            [ -f "$f" ] || continue
+            NEW=$(echo "$f" | sed "s|${RC_TAG}|${TAG}|g")
+            mv "$f" "$NEW"
+          done
+          rm -f checksums.txt
+          sha256sum pg-cdc_* > checksums.txt
+
+      - name: Create stable tag
+        run: |
+          TAG="${{ needs.resolve.outputs.tag }}"
+          RC_TAG="${{ needs.resolve.outputs.rc_tag }}"
+          RC_SHA=$(git rev-list -n 1 "${RC_TAG}" 2>/dev/null || echo "$GITHUB_SHA")
+          git tag "$TAG" "$RC_SHA"
+          git push origin "$TAG"
+
+      - name: Create stable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ needs.resolve.outputs.tag }}"
+          {
+            echo "## pg-cdc ${TAG}"
+            echo ""
+            echo "Promoted from [\`${{ needs.resolve.outputs.rc_tag }}\`](https://github.com/${{ github.repository }}/releases/tag/${{ needs.resolve.outputs.rc_tag }})."
+            echo ""
+            echo "## Install"
+            echo ""
+            echo '```bash'
+            echo "# Linux (amd64)"
+            echo "curl -fsSL https://github.com/${{ github.repository }}/releases/download/${TAG}/pg-cdc_${TAG}_linux_amd64.tar.gz | tar xz"
+            echo ""
+            echo "# macOS (Apple Silicon)"
+            echo "curl -fsSL https://github.com/${{ github.repository }}/releases/download/${TAG}/pg-cdc_${TAG}_darwin_arm64.tar.gz | tar xz"
+            echo '```'
+            echo ""
+            echo "## Checksums"
+            echo '```'
+            cat dist/checksums.txt
+            echo '```'
+          } > /tmp/release-notes.md
+
+          gh release create "${TAG}" dist/* \
+            --repo ${{ github.repository }} \
+            --title "pg-cdc ${TAG}" \
+            --notes-file /tmp/release-notes.md \
+            --latest
+
+      - name: Mirror to public repo
+        env:
+          MIRROR_PAT: ${{ secrets.MIRROR_PAT }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -z "$MIRROR_PAT" ]; then
+            echo "::notice::MIRROR_PAT not set; skipping public repo mirror"
+            exit 0
+          fi
+          if ! gh api "repos/${{ env.PUBLIC_REPO }}" --silent 2>/dev/null; then
+            echo "::notice::Public mirror repo ${{ env.PUBLIC_REPO }} does not exist yet; skipping mirror (infra is ready — create the repo to activate)"
+            exit 0
+          fi
+          TAG="${{ needs.resolve.outputs.tag }}"
+          git remote add public https://x-access-token:${MIRROR_PAT}@github.com/${{ env.PUBLIC_REPO }}.git
+          git push public main --force 2>/dev/null || true
+          git push public "${TAG}" --force 2>/dev/null || true
+          gh release create "${TAG}" dist/* \
+            --repo ${{ env.PUBLIC_REPO }} \
+            --title "pg-cdc ${TAG}" \
+            --notes-file /tmp/release-notes.md \
+            --latest 2>/dev/null || echo "::warning::Failed to create public release"
