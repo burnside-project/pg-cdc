@@ -4,7 +4,7 @@
 </p>
 
 <p align="center">
-  PostgreSQL change data capture &rarr; Parquet. Stream WAL changes into typed, compacted Parquet files on S3, GCS, or filesystem. Single Go binary. No CGO. No Kafka.
+  The security boundary between production PostgreSQL databases and AI agents.
 </p>
 
 <p align="center">
