@@ -15,13 +15,34 @@
   <a href="https://github.com/burnside-project/pg-cdc/stargazers"><img src="https://img.shields.io/github/stars/burnside-project/pg-cdc?style=social" alt="Stars"></a>
 </p>
 
-## Why pg-cdc?
+# pg-cdc + pg-warehouse
 
-Change data capture from PostgreSQL is usually delivered by Debezium + Kafka + a warehouse loader — three moving parts with their own JVM, schema registry, and ops cost. pg-cdc replaces that stack with a single Go binary that reads WAL via native PostgreSQL logical replication, writes typed Parquet directly to S3/GCS/filesystem, and (optionally) registers tables in AWS Glue. No Kafka. No Java. No warehouse to pre-provision.
+The security boundary between production PostgreSQL databases and AI agents.
+
+Streams WAL changes into typed, compacted Parquet files in cloud storage. Creates a physical air gap — agents and developers query governed, immutable data without ever touching production. Pure Go. No CGO. Single binary.
+
+## Architecture
+
+```
++-------------------------------+     +-------------------------------+
+|       PRODUCTION ZONE         |     |     GOVERNED DATA ZONE        |
+|                               |     |                               |
+|  PostgreSQL                   |     |  S3 (immutable Parquet)       |
+|         |                     |     |    Catalog + ACL Tags       |
+|         | WAL (one-way)       |     |  ACL Policy + Audit Trail   |
+|         v                     |     |         |             |       |
+|      pg-cdc ------------------|---->|   MCP Server     pg-warehouse |
+|                               |     |   (AI agents)    (developers) |
++-------------------------------+     +-------------------------------+
+```
 
 ## What does it solve?
 
-A PostgreSQL CDC server that streams WAL changes into typed, compacted Parquet files in cloud storage. Follows the native PostgreSQL replica pattern: one publication, one replication slot, one streaming consumer. Suitable for teams who want CDC output as Parquet for downstream warehouses, data lakes, or analytical engines — without running Kafka, Debezium, or a warehouse loader.
+- **No return path** — agents cannot write to production; the WAL is one-way, Parquet is immutable
+- **No database credentials** — agents authenticate via IAM, not connection strings
+- **Governed by default** — ACL tags gate every read; untagged data is invisible
+- **Time travel built in** — CDC epochs provide historical queries without database branching
+
 
 ## Architecture
 
@@ -33,25 +54,21 @@ Multiple developers pull from the same CDC stream independently. No shared DuckD
 
 Internally, pg-cdc uses hexagonal architecture with clean port/adapter separation. CLI commands (Cobra) call services that depend only on port interfaces. Adapters for PostgreSQL (source), Parquet writer, filesystem/S3/GCS sinks, SQLite state, and Glue catalog implement those interfaces. New sinks or catalog backends plug in without changing business logic.
 
-## Quick comparison
-
-|                         | pg-cdc                       | Debezium + Kafka            | AWS DMS                    | Fivetran / Airbyte          |
-|-------------------------|------------------------------|-----------------------------|----------------------------|-----------------------------|
-| Output format           | Parquet (typed, columnar)    | Avro/JSON via Kafka         | Multiple, via engine       | Warehouse-native            |
-| Infrastructure          | Single Go binary             | Kafka + Connect + JVM       | Managed AWS service        | SaaS                        |
-| Logical replication     | Native pglogrepl             | Debezium connector          | Proprietary                | Via connectors              |
-| Sinks                   | Filesystem, S3, GCS          | Kafka topics                | S3, Redshift, others       | Warehouses                  |
-| Catalog                 | AWS Glue (optional)          | None                        | Glue                       | Varies                      |
-| Cloud required          | No                           | No (but heavy)              | Yes                        | Yes                         |
-| Language / runtime      | Go, no CGO                   | Java (JVM)                  | Managed                    | Managed                     |
+                  |
 
 ## How does it work?
 
 ```
-PostgreSQL ──WAL──→ pg-cdc ──Parquet──→ Cloud Storage
-                      │                  (S3 / GCS / filesystem)
-                      │
-                      └──→ AWS Glue (optional: table catalog)
++-------------------------------+     +-------------------------------+
+|       PRODUCTION ZONE         |     |     GOVERNED DATA ZONE        |
+|                               |     |                               |
+|  PostgreSQL                   |     |  S3 (immutable Parquet)       |
+|         |                     |     |    Catalog + ACL Tags       |
+|         | WAL (one-way)       |     |  ACL Policy + Audit Trail   |
+|         v                     |     |         |             |       |
+|      pg-cdc ------------------|---->|   MCP Server     pg-warehouse |
+|                               |     |   (AI agents)    (developers) |
++-------------------------------+     +-------------------------------+
 ```
 
 pg-cdc uses PostgreSQL's native logical replication:
