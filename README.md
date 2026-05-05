@@ -74,7 +74,7 @@ Full walkthrough: [`docs/01-getting-started.md`](docs/01-getting-started.md).
 
 ## Architecture
 
-![artech.png](assets/artech.png)
+![1.png](assets/1.png)
 
 ## Docs
 | Doc | Description |
