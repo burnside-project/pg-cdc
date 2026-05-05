@@ -26,6 +26,7 @@ func main() {
 
 	root.AddCommand(initCmd())
 	root.AddCommand(startCmd())
+	root.AddCommand(mcpCmd())
 	root.AddCommand(compactCmd())
 	root.AddCommand(statusCmd())
 	root.AddCommand(discoverCmd())
