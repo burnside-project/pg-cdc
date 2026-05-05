@@ -263,7 +263,7 @@ See [`docs/commercial-edition.md`](docs/commercial-edition.md) for the end-to-en
 
 Release candidates auto-increment on every push to `main` against the version in `VERSION`: e.g. `v0.2.0-rc1`, `v0.2.0-rc2`, … When ready, a stable release is promoted from the latest RC via the **Release** workflow dispatch (creates the bare `vX.Y.Z` tag, marks the GitHub release as `--latest`, and renames the binaries).
 
-Latest stable: **v0.2.0** — see [Releases](https://github.com/burnside-project/pg-cdc/releases).
+Latest stable: **v0.2.0** — see [Releases](https://github.com/burnside-project/pg-cdc/releases). Maintainer guide: [`RELEASING.md`](RELEASING.md).
 
 ## Community
 

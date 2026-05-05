@@ -72,6 +72,10 @@ Use clear, conventional-commit-style messages:
 - `chore(deps): bump pgx/v5 to 5.9.2`
 - `ci: run lint on Go 1.25 only`
 
+## Releasing
+
+If you're cutting a release (RC or stable), see [`RELEASING.md`](RELEASING.md) for the full process — it covers the auto-RC pipeline, manual stable promotion via `workflow_dispatch`, the `VERSION` bump cadence, and a few gotchas (Release Drafter blocking RCs, install-URL bumps, dependabot stack rebases).
+
 ## Code of Conduct
 
 This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md).
