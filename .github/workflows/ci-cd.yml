@@ -71,7 +71,10 @@ jobs:
           BASE=$(cat VERSION | tr -d '[:space:]')
           TAG_BASE="v${BASE}"
 
-          if gh release view "$TAG_BASE" --repo ${{ github.repository }} --json tagName --jq '.tagName' 2>/dev/null; then
+          # Skip RC builds only if a non-draft (stable) release matches the
+          # current VERSION. Drafts created by release-drafter for the next
+          # version must NOT block RC builds for the current one.
+          if gh release view "$TAG_BASE" --repo ${{ github.repository }} --json tagName,isDraft --jq 'select(.isDraft|not).tagName' 2>/dev/null | grep -q .; then
             echo "::notice::Stable ${TAG_BASE} exists. Bump VERSION for new RCs."
             echo "skip=true" >> $GITHUB_OUTPUT
             exit 0
