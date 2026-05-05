@@ -65,15 +65,32 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO cdc_user;
 
 ## Install
 
+Latest stable is **v0.2.0**.
+
 ```bash
 # macOS (Apple Silicon)
-curl -fsSL https://github.com/burnside-project/pg-cdc/releases/latest/download/pg-cdc_darwin_arm64.tar.gz | tar xz
+curl -fsSL https://github.com/burnside-project/pg-cdc/releases/download/v0.2.0/pg-cdc_v0.2.0_darwin_arm64.tar.gz | tar xz
 sudo install -m 0755 pg-cdc-darwin-arm64 /usr/local/bin/pg-cdc
 
 # Linux (amd64)
-curl -fsSL https://github.com/burnside-project/pg-cdc/releases/latest/download/pg-cdc_linux_amd64.tar.gz | tar xz
+curl -fsSL https://github.com/burnside-project/pg-cdc/releases/download/v0.2.0/pg-cdc_v0.2.0_linux_amd64.tar.gz | tar xz
 sudo install -m 0755 pg-cdc-linux-amd64 /usr/local/bin/pg-cdc
 
+# Linux (arm64)
+curl -fsSL https://github.com/burnside-project/pg-cdc/releases/download/v0.2.0/pg-cdc_v0.2.0_linux_arm64.tar.gz | tar xz
+sudo install -m 0755 pg-cdc-linux-arm64 /usr/local/bin/pg-cdc
+
+pg-cdc version
+```
+
+**Windows (amd64)** — PowerShell:
+
+```powershell
+Invoke-WebRequest https://github.com/burnside-project/pg-cdc/releases/download/v0.2.0/pg-cdc_v0.2.0_windows_amd64.zip -OutFile pg-cdc.zip
+Expand-Archive pg-cdc.zip -DestinationPath .
+New-Item -ItemType Directory -Force "$env:USERPROFILE\bin" | Out-Null
+Move-Item pg-cdc-windows-amd64.exe "$env:USERPROFILE\bin\pg-cdc.exe"
+# Add %USERPROFILE%\bin to PATH, then:
 pg-cdc version
 ```
 
