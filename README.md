@@ -49,12 +49,12 @@ pg-cdc mcp &                    # serve the local MCP endpoint (stdio)
 
 > The `query` and `recent_changes` MCP tools shell out to DuckDB. Install it once with `brew install duckdb` (macOS) or see [duckdb.org/docs/installation/](https://duckdb.org/docs/installation/).
 
-**3. Point Claude Desktop at it** — add to `claude_desktop_config.json`:
+**3. Point Claude Desktop at it** — add to `claude_desktop_config.json` (use the **absolute** path to your config — Claude Desktop launches the subprocess from its own working directory, not yours):
 
 ```json
 {
   "mcpServers": {
-    "pg-cdc": { "command": "pg-cdc", "args": ["mcp", "--config", "./pg-cdc.yml"] }
+    "pg-cdc": { "command": "pg-cdc", "args": ["mcp", "--config", "/absolute/path/to/pg-cdc.yml"] }
   }
 }
 ```
@@ -84,6 +84,7 @@ Full walkthrough: [`docs/01-getting-started.md`](docs/01-getting-started.md).
 | [Init](docs/03-init.md) | Snapshot phase details |
 | [Streaming](docs/04-streaming.md) | WAL streaming mechanics |
 | [Compaction](docs/05-compaction.md) | Base + delta model, TTL semantics |
+| [MCP Server](docs/06-mcp.md) | Tool reference, client wiring, troubleshooting, security model |
 | [Operations](docs/08-operations.md) | Production run-book, health checks, troubleshooting |
 | [Commercial Edition](docs/commercial-edition.md) | Governance, ACL, Lake Formation reconciliation |
 
@@ -260,9 +261,9 @@ See [`docs/commercial-edition.md`](docs/commercial-edition.md) for the end-to-en
 
 ## Versioning
 
-Release candidates auto-increment on every push to `main`: `v0.1.0-rc1`, `v0.1.0-rc2`, ...
+Release candidates auto-increment on every push to `main` against the version in `VERSION`: e.g. `v0.2.0-rc1`, `v0.2.0-rc2`, … When ready, a stable release is promoted from the latest RC via the **Release** workflow dispatch (creates the bare `vX.Y.Z` tag, marks the GitHub release as `--latest`, and renames the binaries).
 
-Stable releases are promoted from RCs via the **Release** workflow dispatch.
+Latest stable: **v0.2.0** — see [Releases](https://github.com/burnside-project/pg-cdc/releases).
 
 ## Community
 
