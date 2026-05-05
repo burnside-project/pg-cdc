@@ -110,6 +110,30 @@ These are in open-source pg-cdc and stay there:
 
 The commercial edition *depends on* open-source pg-cdc — it is built as an extension, not a fork.
 
+## Governance in action
+
+End to end, with screenshots:
+
+**1. pg-cdc writes Parquet + manifest to cloud storage** — one prefix per table, plus a top-level `manifest.json` describing schema and epoch ordering:
+
+![S3 Parquet output — per-table prefixes and manifest.json](../assets/s3-parquet-output.png)
+
+**2. pg-cdc registers Parquet tables in Glue Data Catalog** — the open-source `catalog register` command populates the catalog for downstream query engines:
+
+![Glue Data Catalog with CDC-registered Parquet tables](../assets/glue-catalog-tables.png)
+
+**3. Operators apply ACL changes via GitHub Actions workflow dispatch** — a click-ops UI that wraps `pg-cdc acl set`. Tag keys and values are constrained to the Layer-1 taxonomy; an audit reason (≥8 chars) is required before the workflow runs:
+
+![GitHub Actions workflow dispatch form for applying ACL tag changes](../assets/ops-acl-workflow-dispatch.png)
+
+**4. Governance intent is stored in a DynamoDB ACL registry** — each workflow run writes a versioned record, tagged (e.g. `sensitivity: internal`) and stamped with actor, reason, and timestamp:
+
+![DynamoDB ACL registry item — versioned policy record with tags](../assets/dynamodb-acl-registry.png)
+
+**5. Tags are reconciled as LF-Tags on Glue tables** — `pg-cdc acl sync` drives Lake Formation's tag-based access control from the registry:
+
+![Lake Formation LF-Tags on a CDC table](../assets/lake-formation-lf-tags.png)
+
 ## Licensing
 
 The commercial edition is distributed by Burnside under a commercial license. For evaluation, pricing, or deployment assistance, contact your Burnside representative.

@@ -4,7 +4,7 @@
 </p>
 
 <p align="center">
-  The security boundary between production PostgreSQL databases and AI agents.
+Talk to your Postgres from Claude in 5 minutes — no prod credentials, no cloud account.
 </p>
 
 <p align="center">
@@ -15,83 +15,77 @@
   <a href="https://github.com/burnside-project/pg-cdc/stargazers"><img src="https://img.shields.io/github/stars/burnside-project/pg-cdc?style=social" alt="Stars"></a>
 </p>
 
-# pg-cdc + pg-warehouse
+<!-- TODO: replace with assets/demo.gif once the 30-second demo is recorded. -->
+<p align="center">
+  <em>[demo GIF: psql INSERT → Claude answer that includes the new row]</em>
+</p>
 
-The security boundary between production PostgreSQL databases and AI agents.
+## What is pg-cdc?
 
-Streams WAL changes into typed, compacted Parquet files in cloud storage. Creates a physical air gap — agents and developers query governed, immutable data without ever touching production. Pure Go. No CGO. Single binary.
+pg-cdc streams your Postgres WAL into typed Parquet files on your laptop, then exposes them through a local **MCP server**. Claude (or Cursor, or any MCP-compatible client) can answer real questions about your real, current data — without touching prod, and without ever seeing your `DATABASE_URL`.
+
+It's the fastest way to let an AI chat with your Postgres safely.
+
+## 5-minute quickstart
+
+**1. Configure** — `pg-cdc.yml`:
+
+```yaml
+source:
+  postgres:
+    url: postgresql://localhost:5432/mydb
+    schemas: [public]
+storage:
+  type: filesystem
+  path: ./data
+```
+
+**2. Run the daemon and the MCP server**:
+
+```bash
+pg-cdc init && pg-cdc start &   # snapshot + stream WAL → ./data
+pg-cdc mcp &                    # serve the local MCP endpoint (stdio)
+```
+
+> The `query` and `recent_changes` MCP tools shell out to DuckDB. Install it once with `brew install duckdb` (macOS) or see [duckdb.org/docs/installation/](https://duckdb.org/docs/installation/).
+
+**3. Point Claude Desktop at it** — add to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "pg-cdc": { "command": "pg-cdc", "args": ["mcp", "--config", "./pg-cdc.yml"] }
+  }
+}
+```
+
+Restart Claude. Ask *"what's the latest row in `orders`?"* — it answers from your real data.
+
+Full walkthrough: [`docs/01-getting-started.md`](docs/01-getting-started.md).
+
+## Why this, not just give Claude a `DATABASE_URL`?
+
+| | pg-cdc | Hand Claude `DATABASE_URL` |
+|---|---|---|
+| **Local & private** | Data never leaves your machine | Credentials shared with the model |
+| **Real-time** | WAL CDC — rows appear seconds after write | One-shot, stale by next question |
+| **Safe & fast** | Parquet snapshot, prod untouched, columnar reads | Live queries against prod, lock contention |
+| **Cost** | Free, single binary, no cloud | Risk of a bad query |
 
 ## Architecture
 
-```
-+-------------------------------+     +-------------------------------+
-|       PRODUCTION ZONE         |     |     GOVERNED DATA ZONE        |
-|                               |     |                               |
-|  PostgreSQL                   |     |  S3 (immutable Parquet)       |
-|         |                     |     |    Catalog + ACL Tags       |
-|         | WAL (one-way)       |     |  ACL Policy + Audit Trail   |
-|         v                     |     |         |             |       |
-|      pg-cdc ------------------|---->|   MCP Server     pg-warehouse |
-|                               |     |   (AI agents)    (developers) |
-+-------------------------------+     +-------------------------------+
-```
+![artech.png](assets/artech.png)
 
-## What does it solve?
-
-- **No return path** — agents cannot write to production; the WAL is one-way, Parquet is immutable
-- **No database credentials** — agents authenticate via IAM, not connection strings
-- **Governed by default** — ACL tags gate every read; untagged data is invisible
-- **Time travel built in** — CDC epochs provide historical queries without database branching
-
-
-## Architecture
-
-**pg-cdc is the cloud-storage + data-governance layer. [pg-warehouse](https://github.com/burnside-project/pg-warehouse) is the developer-friendly local feature and analytics platform that consumes its output.**
-
-pg-cdc produces typed, compacted Parquet files in cloud storage. pg-warehouse consumes them. The contract between them is defined in [burnside-go](https://github.com/burnside-project/burnside-go) — a shared manifest spec with base snapshots, delta epochs, and role-based access profiles derived from PostgreSQL ACLs.
-
-Multiple developers pull from the same CDC stream independently. No shared DuckDB files, no locking, no contention.
-
-Internally, pg-cdc uses hexagonal architecture with clean port/adapter separation. CLI commands (Cobra) call services that depend only on port interfaces. Adapters for PostgreSQL (source), Parquet writer, filesystem/S3/GCS sinks, SQLite state, and Glue catalog implement those interfaces. New sinks or catalog backends plug in without changing business logic.
-
-                  |
-
-## How does it work?
-
-```
-+-------------------------------+     +-------------------------------+
-|       PRODUCTION ZONE         |     |     GOVERNED DATA ZONE        |
-|                               |     |                               |
-|  PostgreSQL                   |     |  S3 (immutable Parquet)       |
-|         |                     |     |    Catalog + ACL Tags       |
-|         | WAL (one-way)       |     |  ACL Policy + Audit Trail   |
-|         v                     |     |         |             |       |
-|      pg-cdc ------------------|---->|   MCP Server     pg-warehouse |
-|                               |     |   (AI agents)    (developers) |
-+-------------------------------+     +-------------------------------+
-```
-
-pg-cdc uses PostgreSQL's native logical replication:
-
-| Stage     | Output                                                                                      |
-|-----------|---------------------------------------------------------------------------------------------|
-| `init`    | Snapshot every table → base Parquet + manifest + (optional) Glue catalog entries            |
-| `start`   | Stream WAL → append-only delta Parquet epochs per table                                     |
-| `compact` | Merge deltas → new base snapshot (applies inserts/updates/deletes; soft-deletes on 30d TTL) |
-
-State survives restarts: LSN position, epoch watermarks, and table metadata live in a local SQLite state file.
-
-## Documentation
-
+## Docs
 | Doc | Description |
 |-----|-------------|
-| [Getting Started](docs/01-getting-started.md) | Install, configure, run a first pipeline |
+| [Getting Started](docs/01-getting-started.md) | 5-minute MCP-first quickstart |
 | [Configuration](docs/02-configuration.md) | Full YAML reference |
 | [Init](docs/03-init.md) | Snapshot phase details |
 | [Streaming](docs/04-streaming.md) | WAL streaming mechanics |
 | [Compaction](docs/05-compaction.md) | Base + delta model, TTL semantics |
 | [Operations](docs/08-operations.md) | Production run-book, health checks, troubleshooting |
-| [Commercial Edition](docs/commercial-edition.md) | Closed-source governance / ACL extensions |
+| [Commercial Edition](docs/commercial-edition.md) | Governance, ACL, Lake Formation reconciliation |
 
 ## Install
 
@@ -115,54 +109,9 @@ cd pg-cdc
 make build
 ```
 
-## Quickstart
+## Production deployment
 
-**1. Configure** — create `pg-cdc.yml`:
-
-```yaml
-source:
-  postgres:
-    url: "postgresql://cdc_user@host:5432/db"
-    schemas: ["public"]
-
-storage:
-  type: filesystem              # filesystem | s3 | gcs
-  path: /var/lib/pg-cdc/output/
-
-replication:
-  publication: pg_cdc_pub
-  slot: pg_cdc_slot
-
-flush:
-  interval_sec: 10
-  max_rows: 1000
-```
-
-**2. Discover tables** — confirm pg-cdc can see what you expect:
-
-```console
-$ pg-cdc discover
-```
-
-**3. Initialize** — snapshot base tables + create the replication slot:
-
-```console
-$ pg-cdc init --config pg-cdc.yml
-```
-
-**4. Start streaming** — tail WAL into Parquet deltas:
-
-```console
-$ pg-cdc start --config pg-cdc.yml
-```
-
-**5. Check health** — LSN lag, epochs, per-table status:
-
-```console
-$ pg-cdc status
-```
-
-See the [Operations guide](docs/08-operations.md) for production deployment patterns.
+The 5-minute quickstart above runs everything locally. For production deployments — running pg-cdc as a systemd service, writing to S3/GCS, registering Glue tables, configuring TLS to RDS — see the [Operations guide](docs/08-operations.md).
 
 ## Features
 
@@ -186,6 +135,11 @@ See the [Operations guide](docs/08-operations.md) for production deployment patt
 **Catalog**
 - [x] AWS Glue (optional; register manifest tables without re-snapshotting)
 
+**AI / MCP**
+- [x] Local MCP server (`pg-cdc mcp`) — read-only, single-user, stdio
+- [x] Tools: `list_tables`, `describe_table`, `query`, `recent_changes`
+- [ ] Multi-user / authenticated MCP — [commercial](docs/commercial-edition.md)
+
 **Operations**
 - [x] Single static binary, no CGO
 - [x] Linux amd64/arm64, macOS arm64, Windows amd64
@@ -199,6 +153,7 @@ See the [Operations guide](docs/08-operations.md) for production deployment patt
 |---------|--------------|
 | `init` | Snapshot tables → base Parquet + manifest + (optional) Glue catalog |
 | `start` | Stream WAL → delta Parquet epochs |
+| `mcp` | Serve a local MCP endpoint over the Parquet output (read-only, single-user) |
 | `compact` | Merge deltas → new base snapshot (applies I/U/D; soft-deletes on TTL) |
 | `status` | Health: lag, LSN, epochs, tables |
 | `discover` | List tables from Postgres |
@@ -245,41 +200,28 @@ Full reference: [`docs/02-configuration.md`](docs/02-configuration.md).
 
 ## Open Core
 
-The open-source edition covers the full CDC pipeline: logical replication, base/delta Parquet output, compaction, three sinks, Glue catalog, and SQLite-backed state. Production governance, compliance, and access-control features are commercial:
+The open-source edition is a complete, working product:
 
-- Layer-2 tag governance (policy-as-code)
+- Full CDC pipeline — logical replication, base/delta Parquet output, compaction
+- Three sink adapters — filesystem, S3, GCS
+- Glue catalog registration (optional)
+- SQLite-backed state
+- **Local MCP server** (`pg-cdc mcp`) — single-user, read-only, stdio
+- Postgres-native ACL discovery (`discover --acl`)
+- Tag-based table inclusion / exclusion
+
+Production governance, compliance, and multi-user features are commercial:
+
+- Layer-2 tag governance (policy-as-code) with required-tag enforcement
 - DynamoDB-backed ACL registry with versioned audit trail
 - AWS Lake Formation reconciliation (`acl diff`, `acl sync`)
+- Authenticated multi-user MCP server with row/column-level access control
 - Emergency-override workflows with expiry
 - Terraform stack for IAM / OIDC / governance provisioning
 - Extended CLI: `pg-cdc acl register|get|set|diff|sync|list`
 - HIPAA-ready deployment topology
 
-### Governance in action
-
-The commercial edition extends open-core CDC output with a tag-based governance layer. End to end:
-
-**1. pg-cdc writes Parquet + manifest to cloud storage** — one prefix per table, plus a top-level `manifest.json` describing schema and epoch ordering:
-
-![S3 Parquet output — per-table prefixes and manifest.json](assets/s3-parquet-output.png)
-
-**2. pg-cdc registers Parquet tables in Glue Data Catalog** — the open-source `catalog register` command populates the catalog for downstream query engines:
-
-![Glue Data Catalog with CDC-registered Parquet tables](assets/glue-catalog-tables.png)
-
-**3. Operators apply ACL changes via GitHub Actions workflow dispatch** — the commercial edition ships a click-ops UI that wraps `pg-cdc acl set`. Tag keys and values are constrained to the Layer-1 taxonomy; an audit reason (≥8 chars) is required before the workflow runs:
-
-![GitHub Actions workflow dispatch form for applying ACL tag changes](assets/ops-acl-workflow-dispatch.png)
-
-**4. Governance intent is stored in a DynamoDB ACL registry** — each workflow run writes a versioned record, tagged (e.g. `sensitivity: internal`) and stamped with actor, reason, and timestamp:
-
-![DynamoDB ACL registry item — versioned policy record with tags](assets/dynamodb-acl-registry.png)
-
-**5. Tags are reconciled as LF-Tags on Glue tables** — `pg-cdc acl sync` drives Lake Formation's tag-based access control from the registry:
-
-![Lake Formation LF-Tags on a CDC table](assets/lake-formation-lf-tags.png)
-
-Details: [`docs/commercial-edition.md`](docs/commercial-edition.md).
+See [`docs/commercial-edition.md`](docs/commercial-edition.md) for the end-to-end governance flow with screenshots: Parquet output → Glue Catalog → ACL workflow → DynamoDB registry → Lake Formation LF-Tags.
 
 ## Related repos
 

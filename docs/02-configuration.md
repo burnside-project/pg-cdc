@@ -2,6 +2,8 @@
 
 pg-cdc is configured via `pg-cdc.yml`. Pass `--config <path>` to override the default location.
 
+> All subcommands — `init`, `start`, `compact`, `mcp`, `status`, `discover`, `teardown`, `catalog register` — read the same config file. The MCP server (`pg-cdc mcp`) does **not** open a Postgres connection; it only uses `storage` to locate the Parquet output. The `source.postgres` block is read by the daemon (`init`, `start`) only.
+
 ## Full Reference
 
 ```yaml
