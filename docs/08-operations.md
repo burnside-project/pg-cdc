@@ -156,6 +156,33 @@ pg-cdc catalog register --config pg-cdc.yml
 #  Glue catalog: <database> (<N> tables)
 ```
 
+## `mcp` subcommand
+
+`pg-cdc mcp` serves a local MCP endpoint over stdio so that Claude Desktop, Cursor, and other MCP clients can query the Parquet output. It is normally launched **as a subprocess of the MCP client**, not as a long-running daemon — the client manages the lifecycle.
+
+```bash
+pg-cdc mcp --config /etc/pg-cdc/pg-cdc.yml
+```
+
+For full reference (tools, client wiring, troubleshooting, security model), see [`06-mcp.md`](06-mcp.md).
+
+### Should I run `pg-cdc mcp` under systemd?
+
+Usually no. The stdio transport assumes the parent process owns it — Claude Desktop launches it, terminates it on quit, and restarts it next session. Running it under systemd would create a process with no peer to talk to.
+
+The legitimate cases for managing `pg-cdc mcp` directly:
+- **Local network bridge** — wrapping it behind a stdio-to-TCP shim if you want a remote client to connect to a workstation. (Out of scope for the open core. Consider whether you actually need the commercial edition's authenticated multi-user MCP server before going down this path.)
+- **CI / smoke testing** — `printf '<json-rpc>\n' | pg-cdc mcp --config …` to verify a deployment.
+
+### Quick health check
+
+```bash
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' \
+  | pg-cdc mcp --config /etc/pg-cdc/pg-cdc.yml
+```
+
+You should see a JSON response carrying `protocolVersion`, `serverInfo.name=pg-cdc`, and `serverInfo.version`. If the call hangs or errors, see the troubleshooting section in [`06-mcp.md`](06-mcp.md).
+
 ## `acl` subcommand
 
 The `acl` subcommand group (Layer-2 tag intent in DynamoDB, Lake Formation reconciliation) is part of the [commercial edition](commercial-edition.md). It is not present in this binary.

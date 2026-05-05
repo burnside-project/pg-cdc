@@ -1,215 +1,195 @@
 # Getting Started
 
-## Prerequisites
+> **Goal:** in 5 minutes, ask Claude a question about your real Postgres data — without giving Claude your `DATABASE_URL`.
 
-**PostgreSQL 10+** with logical replication enabled:
+## What you'll have at the end
 
-```sql
--- Check WAL level (must be 'logical')
-SHOW wal_level;
+- A `pg-cdc` daemon streaming your Postgres WAL into Parquet files on disk
+- A local MCP server (stdio) that Claude Desktop, Cursor, or any MCP client can connect to
+- Claude answering questions like *"how many orders did we get today?"* using the **real, current** rows from your database
 
--- If not logical, update postgresql.conf and restart:
--- wal_level = logical
--- max_replication_slots = 4
--- max_wal_senders = 4
--- max_slot_wal_keep_size = 10GB
+No cloud account. No prod credentials shared with the model. Read-only.
+
+## How the pieces fit together
+
+```
+  ┌────────────┐   WAL   ┌──────────┐   Parquet   ┌────────┐
+  │ PostgreSQL │ ──────▶ │  pg-cdc  │ ──────────▶ │ ./data │
+  │  (local or │ logical │  daemon  │  base +     │  on    │
+  │     VM)    │  repl.  │          │  deltas     │  disk  │
+  └────────────┘         └──────────┘             └────┬───┘
+                                                       │ read
+                                                       ▼
+                            ┌─────────────┐    ┌───────────────┐
+                            │   Claude    │ ◀──│ pg-cdc mcp    │
+                            │   Desktop   │MCP │ (stdio, local)│
+                            │ (the LLM)   │    │ via DuckDB    │
+                            └─────────────┘    └───────────────┘
 ```
 
-**PostgreSQL user** with replication privilege:
+Claude (the LLM) runs in your client. The `pg-cdc mcp` server is a deterministic
+tool that reads Parquet via DuckDB. No LLM API calls happen on the server side —
+your data and your queries stay local.
+
+## Prerequisites
+
+- **PostgreSQL 10+** (local or on a VM you can reach), with logical replication enabled (`wal_level = logical`)
+- A Postgres user with `REPLICATION` and `SELECT` on the tables you want to expose
+- **DuckDB CLI** — required by the `query` and `recent_changes` MCP tools:
+  ```bash
+  brew install duckdb         # macOS
+  # or see https://duckdb.org/docs/installation/ for Linux / Windows
+  ```
+- **Claude Desktop** (or any MCP-compatible client — Cursor, Continue, Zed, etc.)
+
+Quick check:
 
 ```sql
-CREATE ROLE cdc_user WITH LOGIN REPLICATION PASSWORD 'secure_password';
+SHOW wal_level;            -- must be 'logical'
+```
+
+If not, edit `postgresql.conf` and restart:
+
+```ini
+wal_level = logical
+max_replication_slots = 4
+max_wal_senders = 4
+```
+
+Create the CDC user:
+
+```sql
+CREATE ROLE cdc_user WITH LOGIN REPLICATION PASSWORD 'secret';
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO cdc_user;
--- Grant on additional schemas as needed
 ```
 
 ## Install
 
 ```bash
+# macOS (Apple Silicon)
+curl -fsSL https://github.com/burnside-project/pg-cdc/releases/latest/download/pg-cdc_darwin_arm64.tar.gz | tar xz
+sudo install -m 0755 pg-cdc-darwin-arm64 /usr/local/bin/pg-cdc
+
 # Linux (amd64)
-curl -fsSL https://github.com/burnside-project/pg-cdc/releases/latest/download/pg-cdc_linux_amd64.tar.gz | tar xz -C /tmp
-sudo install -m 0755 /tmp/pg-cdc-linux-amd64 /usr/local/bin/pg-cdc
+curl -fsSL https://github.com/burnside-project/pg-cdc/releases/latest/download/pg-cdc_linux_amd64.tar.gz | tar xz
+sudo install -m 0755 pg-cdc-linux-amd64 /usr/local/bin/pg-cdc
+
 pg-cdc version
 ```
 
-Or build from source:
+Or build from source: `git clone … && make build`.
 
-```bash
-git clone https://github.com/burnside-project/pg-cdc
-cd pg-cdc
-make build
-sudo install -m 0755 pg-cdc /usr/local/bin/pg-cdc
-```
+---
 
-## Quick Start (Filesystem)
+## The 5-minute walkthrough
 
-### 1. Create config
-
-```bash
-sudo mkdir -p /etc/pg-cdc
-```
+### 1. Configure (one YAML)
 
 ```yaml
-# /etc/pg-cdc/pg-cdc.yml
+# pg-cdc.yml
 source:
   postgres:
-    url: "postgresql://cdc_user:${PGCDC_PASSWORD}@localhost:5432/mydb"
-    schemas: ["public"]
+    url: postgresql://cdc_user:secret@localhost:5432/mydb
+    schemas: [public]
 
 storage:
   type: filesystem
-  path: /var/lib/pg-cdc/output/
-
-replication:
-  publication: pg_cdc_pub
-  slot: pg_cdc_slot
+  path: ./data
 ```
 
-### 2. Initialize — snapshot all tables
+That's the whole config. Three fields. (Full reference: [`02-configuration.md`](02-configuration.md).)
+
+### 2. Snapshot + stream
 
 ```bash
-export PGCDC_PASSWORD=secret
-pg-cdc init --config pg-cdc.yml
+pg-cdc init   --config pg-cdc.yml   # one-time: snapshot tables → Parquet, create replication slot
+pg-cdc start  --config pg-cdc.yml & # tail WAL, append delta Parquet files
 ```
 
-This creates:
-- A PostgreSQL publication and replication slot
-- A consistent snapshot of all tables as base Parquet files
-- A `manifest.json` describing the table catalog
+You should see `./data/public/<table>/` filling up.
 
-### 3. Start streaming
+### 3. Start the local MCP server
 
 ```bash
-pg-cdc start --config pg-cdc.yml
+pg-cdc mcp --config pg-cdc.yml
 ```
 
-Changes in PostgreSQL now appear as delta Parquet files in the output directory.
+This serves an MCP endpoint over stdio. It binds nothing — Claude Desktop launches it as a subprocess. The four tools it exposes:
 
-### 4. Verify
+| Tool | What it does | Backed by |
+|---|---|---|
+| `list_tables` | Tables available from the manifest, with row counts and tags | manifest read |
+| `describe_table` | Column list, Postgres types, nullability for one table | manifest read |
+| `query` | Run a read-only `SELECT` against the Parquet (base + deltas) | DuckDB |
+| `recent_changes` | The latest rows from the streaming delta files for a table | DuckDB |
 
-```bash
-pg-cdc status --config pg-cdc.yml
+Tables are exposed under their Postgres-qualified names, so the LLM can write natural SQL like `SELECT * FROM public.orders WHERE customer_id = 42`. The `query` tool rejects anything that isn't a `SELECT` (or `WITH … SELECT`) — there's no path to mutate your data through this tool.
+
+### 4. Wire it into Claude Desktop
+
+Edit `claude_desktop_config.json` (macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "pg-cdc": {
+      "command": "pg-cdc",
+      "args": ["mcp", "--config", "/absolute/path/to/pg-cdc.yml"]
+    }
+  }
+}
 ```
 
-## Quick Start (GCS)
+Restart Claude Desktop. You should see `pg-cdc` listed in the MCP indicator.
 
-For GCE VMs, the VM service account provides credentials automatically:
+### 5. Try it
 
-```yaml
-# pg-cdc.yml
-source:
-  postgres:
-    url: "postgresql://cdc_user@10.x.x.x:5432/mydb?sslmode=verify-full&sslcert=/etc/pg-cdc/tls/client.crt&sslkey=/etc/pg-cdc/tls/client.key&sslrootcert=/etc/pg-cdc/tls/ca.crt"
+In Claude:
 
-storage:
-  type: gcs
-  bucket: company-data-lake
-  prefix: cdc/prod/
+> *"What tables do I have, and what's the latest row in `orders`?"*
+
+Then in your psql session:
+
+```sql
+INSERT INTO orders (customer_id, total) VALUES (42, 99.50);
 ```
 
-For on-prem, provide a service account key:
+Ask Claude again:
 
-```yaml
-storage:
-  type: gcs
-  bucket: company-data-lake
-  prefix: cdc/prod/
-  credentials_file: /etc/pg-cdc/gcp-sa-key.json
-```
+> *"Did anything new come in?"*
 
-## Quick Start (S3)
+Claude will see the row you just inserted. That's CDC working: WAL → Parquet delta → MCP `recent_changes` → answer.
 
-For EC2, the instance role provides credentials automatically:
+---
 
-```yaml
-# pg-cdc.yml
-source:
-  postgres:
-    url: "postgresql://cdc_user:${RDS_AUTH_TOKEN}@mydb.xxx.rds.amazonaws.com:5432/mydb?sslmode=verify-full&sslrootcert=/etc/pg-cdc/rds-ca.pem"
+## What just happened
 
-storage:
-  type: s3
-  bucket: company-data-lake
-  prefix: cdc/prod/
-  region: us-east-1
-```
+1. `pg-cdc init` connected to Postgres, took a transactionally consistent snapshot of each table, and wrote it as base Parquet.
+2. `pg-cdc start` is now tailing the WAL via a logical replication slot. Every INSERT/UPDATE/DELETE becomes a row in a delta Parquet file under `./data/`.
+3. `pg-cdc mcp` is reading those Parquet files (not your live DB) when Claude asks a question. Your prod database sees no traffic from Claude.
+4. Claude only ever talks to the local MCP process. It never sees your `DATABASE_URL`, your password, or anything network-attached.
 
-## Running as a systemd Service
+## What this free tier is — and isn't
 
-For production deployments, run pg-cdc as a systemd service.
+The open-core MCP plug-in is intentionally scoped for a single developer on their own laptop:
 
-### 1. Create the service user and directories
+| | Open core | [Commercial](commercial-edition.md) |
+|---|---|---|
+| Single user, localhost stdio | ✅ | ✅ |
+| Multi-user / shared MCP endpoint | ❌ | ✅ |
+| Authentication / SSO | ❌ | ✅ |
+| Row/column-level access control | ❌ | ✅ via Lake Formation LF-Tags |
+| Audit log of every query | ❌ | ✅ |
+| HIPAA / SOC2 deployment topology | ❌ | ✅ |
+| Tag-based governance (`PII`, `PHI`, …) | ❌ | ✅ |
 
-```bash
-sudo useradd --system --shell /usr/sbin/nologin --home-dir /var/lib/pg-cdc pgcdc
-sudo mkdir -p /var/lib/pg-cdc /etc/pg-cdc
-sudo chown pgcdc:pgcdc /var/lib/pg-cdc
-sudo chmod 750 /etc/pg-cdc
-```
+If you need any of those, the commercial edition is a drop-in upgrade — same daemon, same Parquet output, governance plane added on top.
 
-### 2. Install the binary and config
+## Next steps
 
-```bash
-sudo cp pg-cdc /usr/local/bin/pg-cdc
-sudo cp pg-cdc.yml /etc/pg-cdc/pg-cdc.yml
-```
-
-### 3. Install the service file
-
-A ready-made unit file is included in [`deploy/systemd/pg-cdc.service`](../deploy/systemd/pg-cdc.service):
-
-```bash
-sudo cp deploy/systemd/pg-cdc.service /etc/systemd/system/
-sudo systemctl daemon-reload
-```
-
-### 4. Enable and start
-
-```bash
-sudo systemctl enable --now pg-cdc
-```
-
-### 5. Verify
-
-```bash
-sudo systemctl status pg-cdc
-sudo journalctl -u pg-cdc -f
-```
-
-To pass secrets without putting them in the config file, create `/etc/pg-cdc/pg-cdc.env`:
-
-```bash
-# /etc/pg-cdc/pg-cdc.env
-PGCDC_PASSWORD=secure_password
-```
-
-Then add `EnvironmentFile=/etc/pg-cdc/pg-cdc.env` to the `[Service]` section of the unit file.
-
-## Connect pg-warehouse
-
-On a developer machine:
-
-```yaml
-# pg-warehouse.yml
-source:
-  storage: /var/lib/pg-cdc/output/    # or gs://bucket/cdc/prod/ or s3://bucket/cdc/prod/
-
-duckdb:
-  raw: raw.duckdb
-  silver: silver.duckdb
-  feature: feature.duckdb
-```
-
-```bash
-pg-warehouse refresh
-pg-warehouse build
-```
-
-## Next Steps
-
-- [Configuration reference](02-configuration.md) — full `pg-cdc.yml` reference
-- [Init & Snapshot](03-init.md) — what `pg-cdc init` does
-- [Streaming](04-streaming.md) — start WAL streaming
-- [Compaction](05-compaction.md) — merge deltas into base snapshots
-- [Operations](08-operations.md) — status, discover, teardown, recovery
-- [Commercial edition](commercial-edition.md) — governance, ACL registry, Lake Formation reconciliation (closed-source extension)
+- [Configuration reference](02-configuration.md) — every `pg-cdc.yml` field
+- [Init & Snapshot](03-init.md) — what happens during the snapshot phase
+- [Streaming](04-streaming.md) — WAL replication mechanics
+- [Compaction](05-compaction.md) — merging deltas into base snapshots
+- [Operations](08-operations.md) — running pg-cdc as a systemd service, S3/GCS sinks, recovery
+- [Commercial edition](commercial-edition.md) — when you outgrow single-user
