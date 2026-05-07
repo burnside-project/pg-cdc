@@ -72,6 +72,32 @@ Full walkthrough: [`docs/01-getting-started.md`](docs/01-getting-started.md).
 | **Safe & fast** | Parquet snapshot, prod untouched, columnar reads | Live queries against prod, lock contention |
 | **Cost** | Free, single binary, no cloud | Risk of a bad query |
 
+## Open Core
+
+The open-source edition is a complete, working product:
+
+- Full CDC pipeline — logical replication, base/delta Parquet output, compaction
+- Three sink adapters — filesystem, S3, GCS
+- Glue catalog registration (optional)
+- SQLite-backed state
+- **Local MCP server** (`pg-cdc mcp`) — single-user, read-only, stdio
+- Postgres-native ACL discovery (`discover --acl`)
+- Tag-based table inclusion / exclusion
+
+## Commercial Platform
+Production governance, compliance, and multi-user features are commercial:
+
+- Layer-2 tag governance (policy-as-code) with required-tag enforcement
+- DynamoDB-backed ACL registry with versioned audit trail
+- AWS Lake Formation reconciliation (`acl diff`, `acl sync`)
+- Authenticated multi-user MCP server with row/column-level access control
+- Emergency-override workflows with expiry
+- Terraform stack for IAM / OIDC / governance provisioning
+- Extended CLI: `pg-cdc acl register|get|set|diff|sync|list`
+- HIPAA-ready deployment topology
+
+See [`docs/commercial-edition.md`](docs/commercial-edition.md) for the end-to-end governance flow with screenshots: Parquet output → Glue Catalog → ACL workflow → DynamoDB registry → Lake Formation LF-Tags.
+
 ## Architecture
 
 ![1.png](assets/1.png)
@@ -214,30 +240,7 @@ tables:
 
 Full reference: [`docs/02-configuration.md`](docs/02-configuration.md).
 
-## Open Core
 
-The open-source edition is a complete, working product:
-
-- Full CDC pipeline — logical replication, base/delta Parquet output, compaction
-- Three sink adapters — filesystem, S3, GCS
-- Glue catalog registration (optional)
-- SQLite-backed state
-- **Local MCP server** (`pg-cdc mcp`) — single-user, read-only, stdio
-- Postgres-native ACL discovery (`discover --acl`)
-- Tag-based table inclusion / exclusion
-
-Production governance, compliance, and multi-user features are commercial:
-
-- Layer-2 tag governance (policy-as-code) with required-tag enforcement
-- DynamoDB-backed ACL registry with versioned audit trail
-- AWS Lake Formation reconciliation (`acl diff`, `acl sync`)
-- Authenticated multi-user MCP server with row/column-level access control
-- Emergency-override workflows with expiry
-- Terraform stack for IAM / OIDC / governance provisioning
-- Extended CLI: `pg-cdc acl register|get|set|diff|sync|list`
-- HIPAA-ready deployment topology
-
-See [`docs/commercial-edition.md`](docs/commercial-edition.md) for the end-to-end governance flow with screenshots: Parquet output → Glue Catalog → ACL workflow → DynamoDB registry → Lake Formation LF-Tags.
 
 ## Related repos
 
