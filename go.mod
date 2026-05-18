@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	github.com/aws/aws-sdk-go-v2 v1.41.7
 	github.com/aws/aws-sdk-go-v2/config v1.32.17
-	github.com/aws/aws-sdk-go-v2/service/glue v1.141.0
+	github.com/aws/aws-sdk-go-v2/service/glue v1.142.0
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.101.0
 	github.com/burnside-project/burnside-go v0.4.0
 	github.com/jackc/pglogrepl v0.0.0-20251213150135-2e8d0df862c1
