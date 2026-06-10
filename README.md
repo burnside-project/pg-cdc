@@ -132,7 +132,7 @@ The differentiator. pg-cdc doesn't just land data — it makes it **default-deny
 
 | Capability | What it does |
 | --- | --- |
-| **Prometheus metrics** | **29** `pgcdc_*` metrics on `:9090/metrics` — replication lag, slot safety, throughput, sink latency/errors, compaction, catalog, Iceberg snapshots, CAS conflicts, backpressure, ACL drift, audit. ([`docs/observability/metrics.md`](docs/observability/metrics.md)) |
+| **Prometheus metrics** | **29** `pgcdc_*` metrics on `:9090/metrics` — replication lag, slot safety, throughput, sink latency/errors, compaction, catalog, Iceberg snapshots, CAS conflicts, backpressure, ACL drift, audit. ([`docs/metrics.md`](docs/metrics.md)) |
 | **CloudWatch dashboard + alarms** | Terraform-managed 11-panel dashboard + 9 alarms, parameterized by `deployment_name`. |
 | **SSE event streams** | `/v1/stream/{status,events,audit}` for live consoles/dashboards without polling. |
 | **Agent-consumable run artifacts** | Per-run `run.json` · `events.ndjson` (stable schema) · `state.json` (minute-cadence LSN/lag/epoch) · `summary.md` — designed for an LLM to crawl. |
