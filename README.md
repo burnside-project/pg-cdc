@@ -15,13 +15,8 @@ Talk to your Postgres from Claude in 5 minutes — no prod credentials, no cloud
   <a href="https://github.com/burnside-project/pg-cdc/stargazers"><img src="https://img.shields.io/github/stars/burnside-project/pg-cdc?style=social" alt="Stars"></a>
 </p>
 
-<!-- TODO: replace with assets/demo.gif once the 30-second demo is recorded. -->
-<p align="center">
-  <em>![cdc.png](assets/cdc.png)</em>
-</p>
-
-
 ![1.png](assets/1.png)
+
 
 **PostgreSQL change data capture → governed Apache Iceberg / Parquet on AWS S3 — built for AI agents.**
 
