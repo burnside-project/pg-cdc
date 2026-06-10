@@ -17,7 +17,7 @@ Talk to your Postgres from Claude in 5 minutes — no prod credentials, no cloud
 
 <!-- TODO: replace with assets/demo.gif once the 30-second demo is recorded. -->
 <p align="center">
-  <em>[demo GIF: psql INSERT → Claude answer that includes the new row]</em>
+  <em>![cdc.png](assets/cdc.png)</em>
 </p>
 
 
