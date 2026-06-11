@@ -2,7 +2,7 @@
 
 > **Audience:** CISOs, security architects, platform teams evaluating pg-cdc for AI agent data access.
 >
-> For deployment-specific hardening, see [Least-Privilege Deployment](security/least-privilege-deployment.md) and [HIPAA Deployment](security/hipaa-deployment.md).
+> For deployment-specific hardening, see [Least-Privilege Deployment](least-privilege-deployment.md) and [HIPAA Deployment](hipaa-deployment.md).
 
 ## The Problem
 
