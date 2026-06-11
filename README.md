@@ -47,6 +47,8 @@ No JVM. One binary.
 - **Governed by default** — untagged data is invisible; Lake Formation tags gate every read, down to the column.
 - **Time travel built in** — every flush is an Iceberg snapshot; CDC epochs + immutable `raw@<ts>` tags give historical queries with no database branching.
 
+### Security Architecture
+
 See [`docs/10-security-architecture.md`](docs/10-security-architecture.md) for the full five-property model and [`docs/11-ai-agent-consumption.md`](docs/11-ai-agent-consumption.md) for the two consumption paths.
 
 ---
