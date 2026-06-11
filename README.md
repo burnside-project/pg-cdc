@@ -34,8 +34,7 @@ Build ai agent from Postgres Operational Data — no prod credentials.
 
 **PostgreSQL change data capture → governed Apache Iceberg / Parquet on AWS S3 — built for AI agents.**
 
-### Book a Meeting
-<a href="https://github.com/burnside-project/pg-cdc/blob/main/assets/pg-cdc-flyer.png"> Book a Meeting</a>
+📅 <a href="https://github.com/burnside-project/pg-cdc/blob/main/assets/pg-cdc-flyer.png"> Book a Meeting</a>
 
 ### Core Features
 
