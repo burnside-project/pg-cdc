@@ -3,8 +3,6 @@
   <h1>pg-cdc</h1>
 </p>
 
-![Burnside Project pg-cdc promo](/assets/pg-cdc-flyer.png)
-
 
 ```
 +-------------------------------+        +-------------------------------------+
@@ -35,6 +33,9 @@ Build ai agent from Postgres Operational Data — no prod credentials.
 
 
 **PostgreSQL change data capture → governed Apache Iceberg / Parquet on AWS S3 — built for AI agents.**
+
+### Book a Meeting
+<a href="https://github.com/burnside-project/pg-cdc/blob/main/assets/pg-cdc-flyer.png"> Book a Meeting</a>
 
 ### Core Features
 
