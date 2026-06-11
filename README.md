@@ -1,32 +1,7 @@
 <!-- Logo placeholder -->
 <p align="center">
-  <strong>pg-cdc</strong>
+  <h1>pg-cdc</h1>
 </p>
-
-<p align="center">
-Talk to your Postgres from Claude in 5 minutes — no prod credentials, no cloud account.
-</p>
-
-<p align="center">
-  <a href="https://github.com/burnside-project/pg-cdc/actions"><img src="https://img.shields.io/github/actions/workflow/status/burnside-project/pg-cdc/ci-cd.yml?branch=main&label=CI" alt="CI"></a>
-  <a href="https://github.com/burnside-project/pg-cdc/releases"><img src="https://img.shields.io/github/v/release/burnside-project/pg-cdc?include_prereleases" alt="Release"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
-  <a href="https://github.com/burnside-project/pg-cdc"><img src="https://img.shields.io/github/go-mod/go-version/burnside-project/pg-cdc" alt="Go"></a>
-  <a href="https://github.com/burnside-project/pg-cdc/stargazers"><img src="https://img.shields.io/github/stars/burnside-project/pg-cdc?style=social" alt="Stars"></a>
-</p>
-
-![1.png](assets/1.png)
-
-
-**PostgreSQL change data capture → governed Apache Iceberg / Parquet on AWS S3 — built for AI agents.**
-
-### Core Features
-
-* pg-cdc is not just replication. pg-cdc streams **Postgres Write Ahead Logs(WAL)** out of production Postgres into typed, immutable, **time-travelable** Iceberg tables on S3
-* Registers each entities in the AWS Glue Catalog
-* Gates every read with **AWS Lake Formation** tags — so AI agents, analysts, and query engines consume governed data **without ever touching the source database, and without database credentials**.
-
-No JVM. One binary.
 
 ```
 +-------------------------------+        +-------------------------------------+
@@ -41,6 +16,31 @@ No JVM. One binary.
 |   (CDC engine)                |        |   (AI agents)    warehouse (devs)   |
 +-------------------------------+        +-------------------------------------+
 ```
+
+<p align="center">
+Build ai agent from Postgres Operational Data — no prod credentials.
+</p>
+
+<p align="center">
+  <a href="https://github.com/burnside-project/pg-cdc/actions"><img src="https://img.shields.io/github/actions/workflow/status/burnside-project/pg-cdc/ci-cd.yml?branch=main&label=CI" alt="CI"></a>
+  <a href="https://github.com/burnside-project/pg-cdc/releases"><img src="https://img.shields.io/github/v/release/burnside-project/pg-cdc?include_prereleases" alt="Release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
+  <a href="https://github.com/burnside-project/pg-cdc"><img src="https://img.shields.io/github/go-mod/go-version/burnside-project/pg-cdc" alt="Go"></a>
+  <a href="https://github.com/burnside-project/pg-cdc/stargazers"><img src="https://img.shields.io/github/stars/burnside-project/pg-cdc?style=social" alt="Stars"></a>
+</p>
+
+
+
+**PostgreSQL change data capture → governed Apache Iceberg / Parquet on AWS S3 — built for AI agents.**
+
+### Core Features
+
+* pg-cdc is not just replication. pg-cdc streams **Postgres Write Ahead Logs(WAL)** out of production Postgres into typed, immutable, **time-travelable** Iceberg tables on S3
+* Registers each entities in the AWS Glue Catalog
+* Gates every read with **AWS Lake Formation** tags — so AI agents, analysts, and query engines consume governed data **without ever touching the source database, and without database credentials**.
+
+No JVM. One binary.
+
 
 - **No return path** — the WAL is one-way; Parquet is immutable. Agents physically cannot write to production.
 - **No database credentials** — consumers authenticate via AWS IAM + Lake Formation, never a connection string.
