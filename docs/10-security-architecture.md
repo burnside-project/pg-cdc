@@ -33,6 +33,8 @@ Production Database
 
 There is no return path. The agent cannot write to production — not because of a policy, but because **the protocol doesn't exist**. The WAL is one-way. Parquet is immutable. S3 has no `UPDATE` verb. The agent doesn't have a connection string because there is no connection.
 
+And when an agent needs to *act* — "cancel my order", "update address" — it still doesn't get a return path. It **requests** a bounded, authorized command through a separate relay that the agent cannot drive. See [Taking Action](#taking-action--writes-without-a-return-path) below.
+
 ## Three Security Zones
 
 ```
@@ -140,6 +142,33 @@ Security tags table "PII" in DynamoDB
 ```
 
 The governance isn't a layer on top. It's the **only path to the data**. You can't bypass it because there's nothing to bypass — no alternative route to the bits.
+
+## Taking Action — Writes Without a Return Path
+
+The air gap is one-way *by design* — but real agents must act: "cancel my order", "update my address", "issue a refund". The naïve fix is to hand the agent a write path to production, which destroys every property above. pg-cdc keeps reads one-way and resolves this with **CQRS**: the **read model** is the governed zone; the **write model** is a separate, narrow **command relay** the agent can only *request* through, never drive.
+
+The agent never writes. It **submits a typed intent** to an out-of-band command queue. A trusted **relay** — the only component holding a (scoped) production write credential — consumes the command, re-authorizes it server-side, validates it against authoritative state, applies it through the application's domain API, and audits it. The result flows back **through CDC**, so the agent observes its action in the governed zone.
+
+```
+ PRODUCTION ZONE                        GOVERNED DATA ZONE (read model)
+  PostgreSQL ──WAL(one-way)──▶ pg-cdc ──▶ S3/Iceberg + Glue/LF
+      ▲                                       │  IAM read · no DB creds
+      │ scoped app write                      ▼
+  Command Relay ◀── queue ◀── Command API / MCP submit_command ◀── AI agent
+  (sole write cred)  (durable,   (enqueues intent; NO DB creds)     (decides
+                      ordered)                                       from reads)
+      └─ the write ▶ WAL ▶ pg-cdc ▶ governed zone ▶ agent sees the result
+```
+
+A "cancel order" never touches the database from the agent's side. The agent emits `{type:"cancel_order", order_id, idempotency_key, based_on_epoch}`; the command API (queue-publish only — **no DB credential**) enqueues it; the relay re-checks authorization, confirms the order is still cancellable against **live** state (rejecting if it moved since the agent's epoch), and applies it via the order service. The agent gets an async acknowledgement and sees `status=cancelled` on its next read.
+
+**Why this is not a hole in the air gap:**
+
+- The agent still has **no DB connection, no write verb, no connection string** — Property #1 is untouched. It can only *request* an allowlisted, typed command set; the command vocabulary is a small, reviewed surface, never "run this SQL."
+- Every command is **re-authorized server-side** against the same governance plane that gates reads (Property #5), **validated against authoritative state**, **idempotent**, and **audited** end-to-end. High-blast-radius commands route to a human approval gate.
+- A compromised agent can only request commands it is authorized for, which the relay re-validates and may reject — it cannot escalate to arbitrary writes (Property #2 holds).
+
+The rule of thumb: **reads are physics (one-way); writes are policy (a bounded, authorized, audited command channel) — and never the same channel.** The relay is the one small trust boundary that replaces "trust the agent with the database."
 
 ## How This Composes with the Two Governance Models
 
