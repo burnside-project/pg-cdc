@@ -3,6 +3,9 @@
   <h1>pg-cdc</h1>
 </p>
 
+![Burnside Project pg-cdc promo](/assets/pg-cdc-flyer.png)
+
+
 ```
 +-------------------------------+        +-------------------------------------+
 |       PRODUCTION ZONE         |        |        GOVERNED DATA ZONE           |
