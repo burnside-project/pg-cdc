@@ -1,6 +1,6 @@
 <!-- Logo placeholder -->
 <p align="center">
-  <h1>pg-cdc</h1>
+  <h1>pg-cdc - Frustratingly simple change data capture for Postgres to AWS S3</h1>
 </p>
 
 
