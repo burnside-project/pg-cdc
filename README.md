@@ -5,17 +5,17 @@
 
 
 ```
-+-------------------------------+        +-------------------------------------+
-|       PRODUCTION ZONE         |        |        GOVERNED DATA ZONE           |
-|                               |        |                                     |
-|  PostgreSQL                   |        |  S3  · immutable Iceberg/Parquet    |
-|  self-managed · RDS · Aurora  |        |  Glue Catalog + Lake Formation tags |
-|         |                     |        |  DynamoDB ACL intent + audit trail  |
-|         |  WAL  (one-way)     |        |        |              |             |
-|         v                     |        |        v              v             |
-|      pg-cdc ------------------|------->|   MCP server     REST API / pg-      |
-|   (CDC engine)                |        |   (AI agents)    warehouse (devs)   |
-+-------------------------------+        +-------------------------------------+
++-------------------------------+        +----------------------------------------------------+
+|       PRODUCTION ZONE         |        |        GOVERNED DATA ZONE                          |
+|                               |        |                                                    |
+|  PostgreSQL                   |        |  S3  · immutable Iceberg/Parquet                   |
+|  self-managed · RDS · Aurora  |        |  Catalog + Governance tags                         |
+|         |                     |        |            audit trail                             |
+|         |  WAL  (one-way)     |        |        |              |                            |
+|         v                     |        |        v              v                            |
+|      pg-cdc ------------------|------->|   MCP server     REST API / pg-warehouse(dev Tools)|
+|   (CDC engine)                |        |   (AI agents)                                      |
++-------------------------------+        +----------------------------------------------------+
 ```
 
 <p align="center">
