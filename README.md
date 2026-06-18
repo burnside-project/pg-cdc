@@ -3,7 +3,10 @@
 <h1>pg-cdc — A frustratingly simple way to create governed operational data from PostgreSQL for AI applications.</h1>
 </p>
 
-
+<div class="marketplace-badge">
+  <img src="/assets/aws-marketplace.png" alt="AWS Marketplace" height="24" />
+  <span>Coming Soon</span>
+</div>
 ```
 +-------------------------------+        +----------------------------------------------------+
 |       PRODUCTION ZONE         |        |        GOVERNED DATA ZONE                          |
