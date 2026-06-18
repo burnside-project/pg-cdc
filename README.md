@@ -1,12 +1,19 @@
-<!-- Logo placeholder -->
+
+
+<h1 align="center">
+  pg-cdc — A frustratingly simple way to create governed operational data from PostgreSQL for AI applications.
+</h1>
+
 <p align="center">
-<h1>pg-cdc — A frustratingly simple way to create governed operational data from PostgreSQL for AI applications.</h1>
+  <strong>Build AI agents from PostgreSQL operational data — no production credentials.</strong>
 </p>
 
-<div class="marketplace-badge">
-  <img src="/assets/aws-marketplace.png" alt="AWS Marketplace" height="24" />
-  <span>Coming Soon</span>
-</div>
+<p align="center">
+  <img src="/assets/aws-marketplace.png" alt="AWS Marketplace" height="36" />
+  <br />
+  <strong>Coming Soon on AWS Marketplace</strong>
+</p>
+
 ```
 +-------------------------------+        +----------------------------------------------------+
 |       PRODUCTION ZONE         |        |        GOVERNED DATA ZONE                          |
