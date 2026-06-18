@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="/assets/aws-marketplace.png" alt="AWS Marketplace" height="36" />
+  <img src="/assets/aws-marketplace.png" alt="AWS Marketplace" height="83" />
   <br />
   <strong>Coming Soon on AWS Marketplace</strong>
 </p>
