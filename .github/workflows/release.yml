@@ -24,7 +24,7 @@ jobs:
       tag: ${{ steps.resolve.outputs.tag }}
       rc_tag: ${{ steps.resolve.outputs.rc_tag }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Determine tags
@@ -64,7 +64,7 @@ jobs:
     needs: resolve
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
