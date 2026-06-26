@@ -9,24 +9,8 @@
 </p>
 
 <p align="center">
-  <img src="/assets/aws-marketplace.png" alt="AWS Marketplace" height="83" />
-  <br />
-  <strong>Coming Soon on AWS Marketplace</strong>
+  <img src="assets/pg-cdc-logo.png" alt="AWS Marketplace"/>
 </p>
-
-```
-+-------------------------------+        +----------------------------------------------------+
-|       PRODUCTION ZONE         |        |        GOVERNED DATA ZONE                          |
-|                               |        |                                                    |
-|  PostgreSQL                   |        |  S3  · immutable Iceberg/Parquet                   |
-|  self-managed · RDS · Aurora  |        |  Catalog + Governance tags                         |
-|         |                     |        |            audit trail                             |
-|         |  WAL  (one-way)     |        |        |              |                            |
-|         v                     |        |        v              v                            |
-|      pg-cdc ------------------|------->|   MCP server     REST API / pg-warehouse(dev Tools)|
-|   (CDC engine)                |        |   (AI agents)                                      |
-+-------------------------------+        +----------------------------------------------------+
-```
 
 <p align="center">
 Build ai agent from Postgres Operational Data — no prod credentials.
