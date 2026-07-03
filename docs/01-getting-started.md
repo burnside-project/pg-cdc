@@ -1,3 +1,5 @@
+## Getting Started
+
 **Stream PostgreSQL WAL → governed Apache Iceberg on S3. Purpose-built for AWS enterprise workloads where zero-trust data governance, auditability, and operational rigor are non-negotiable.**
 
 
