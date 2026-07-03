@@ -5,6 +5,14 @@
 </h1>
 
 <p align="center">
+  <a href="https://aws.amazon.com/marketplace/pp/prodview-vpbhhtmdwzezy">
+    <img src="assets/image.png" width="100%" alt="Available on AWS Marketplace">
+  </a>
+</p>
+
+
+
+<p align="center">
   <strong>Build AI agents from PostgreSQL operational data — no production credentials.</strong>
 </p>
 
