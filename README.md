@@ -41,19 +41,24 @@ Build ai agent from Postgres Operational Data — no prod credentials.
 
 <a href="https://aws.amazon.com/marketplace/pp/prodview-vpbhhtmdwzezy"> AWS MarketplaceListing</a>
 
-### Core Features
+### What pg-cdc IS:
 
-* pg-cdc is not just replication. pg-cdc streams **Postgres Write Ahead Logs(WAL)** out of production Postgres into typed, immutable, **time-travelable** Iceberg tables on S3
-* Registers each entities in the AWS Glue Catalog
-* Gates every read with **AWS Lake Formation** tags — so AI agents, analysts, and query engines consume governed data **without ever touching the source database, and without database credentials**.
-
-No JVM. One binary.
-
-
-- **No return path** — the WAL is one-way; Parquet is immutable. Agents physically cannot write to production.
+- **One-way valve	WAL** - Iceberg/Parquet on S3. No return path to PG. Immutable, append-only, time-travelable.
+- **Governance boundary** -	Every read gated by AWS Lake Formation tags + column-level ACL. No DB credentials ever reach consumers.
+- **AI consumption layer** -	MCP server (8 tools) + REST API — purpose-built for agents, not for app queries.Schema evolves live	Detects ADD/DROP COLUMN, propagates to Glue + Iceberg without restart.
+- **Crash-safe** -	confirmed_flush_lsn advances only after Parquet + Iceberg + manifest are durable. At-least-once.
+- **Single binary** -	Go, no CGO, no PG extension, no sidecars. Works with any PG ≥10 (RDS, Aurora, self-managed).
 - **No database credentials** — consumers authenticate via AWS IAM + Lake Formation, never a connection string.
-- **Governed by default** — untagged data is invisible; Lake Formation tags gate every read, down to the column.
-- **Time travel built in** — every flush is an Iceberg snapshot; CDC epochs + immutable `raw@<ts>` tags give historical queries with no database branching.
+
+### What pg-cdc is NOT:
+
+- **Storage tiering** -	It doesn't keep hot data in PG. Everything leaves PG. pg-cdc snapshots data out of PG entirely.
+- **Query engine** -	pg-cdc delegates the actual query to DuckDB
+- **PG extension** -	It's an external Go process. No shared_preload_libraries, no C hooks, no PG restart.
+- **Application data plane** -	Your app doesn't read through pg-cdc. Your app keeps hitting PG. pg-cdc feeds a separate governed zone for analytics / AI / compliance.
+- **Bidirectional** -	No writes back to PG. No writes back to the Iceberg. Append-only.
+- **General-purpose replication** -	It's not a standby, not a read replica, not a replicate-to-another-PG tool. It's WAL → columnar lake, full stop.
+
 
 ### Security Architecture
 
